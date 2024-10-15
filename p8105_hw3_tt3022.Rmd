@@ -8,3 +8,116 @@ date: "2024-10-15"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+# Problem 2
+load libraries
+```{r load_libraries}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+```
+
+Load the datasets
+```{r}
+covar <- read_csv("D:/P8105/p8105_hw3_tt3022/Data/nhanes_covar.csv", skip = 4) 
+accel <- read_csv("D:/P8105/p8105_hw3_tt3022/Data/nhanes_accel.csv")
+
+```
+
+Clean and filter
+
+```{r}
+# Merge the datasets using full_join to ensure all participants are included
+merged_df <- full_join(covar, accel, by = "SEQN")
+filtered_df <- merged_df %>%
+  filter(!is.na(age) & age >= 21 & !is.na(sex) & !is.na(BMI) & !is.na(education))
+filtered_df <- filtered_df %>%
+  mutate(
+    sex = factor(sex, levels = c(1, 2), labels = c("Male", "Female")),
+    education = factor(education, levels = c(1, 2, 3), labels = c("Less than high school", "High school equivalent", "More than high school"))
+  )
+```
+
+Create table
+```{r}
+gender_education_table <- filtered_df %>%
+  group_by(education, sex) %>%
+  summarise(count = n()) %>%
+  pivot_wider(names_from = sex, values_from = count, values_fill = 0)
+```
+
+```{r}
+ggplot(filtered_df, aes(x = age, fill = sex)) +
+  geom_histogram(position = "stack", bins = 20, color = "black") +
+  facet_wrap(~education) +
+  labs(title = "Age Distribution for Men and Women by Education Level", 
+       x = "Age", 
+       y = "Count") +
+  scale_fill_manual(values = c("Male" = "blue", "Female" = "pink")) + 
+  theme_minimal() +
+  theme(legend.title = element_text(size = 10),
+        legend.text = element_text(size = 8),
+        strip.text = element_text(size = 12))
+ggsave("D:/P8105/p8105_hw3_tt3022/picture/age_distribution_by_education.png", width = 8, height = 6)
+```
+The age distribution for participants with less than a high school education appears to be spread out across age groups.
+For participants with a high school equivalent education,there are some gaps where certain age ranges have fewer participants.
+For participants with more than High School Education,there is a slight imbalance, with more females than males in younger age groups.
+
+```{r}
+filtered_df <- filtered_df %>%
+  mutate(total_activity = rowSums(select(., starts_with("min")), na.rm = TRUE))
+ggplot(filtered_df, aes(x = age, y = total_activity, color = sex)) +
+  geom_point(alpha = 0.6) +  
+  geom_smooth(method = "loess", se = FALSE) +  
+  facet_wrap(~education) +  
+  labs(title = "Total Activity vs. Age by Sex and Education Level", 
+       x = "Age", 
+       y = "Total Activity (Aggregated MIMS)") +
+  theme_minimal() +
+  theme(legend.title = element_text(size = 10),
+        legend.text = element_text(size = 8),
+        strip.text = element_text(size = 12))
+ggsave("D:/P8105/p8105_hw3_tt3022/picture/total_activity_vs_age.png", 
+       width = 8, height = 6)
+```
+
+In general, there is a clear decline in total activity with increasing age across all education levels, though the trend varies slightly between men and women. Notably, women tend to maintain higher activity levels compared to men in the "More than high school" category, particularly in the older age groups.
+
+
+It spend too much time to run it, I downsampled it.
+```{r}
+long_df <- filtered_df %>%
+  pivot_longer(cols = starts_with("min"), 
+               names_to = "minute", 
+               names_prefix = "min", 
+               values_to = "activity") %>%
+  mutate(minute = as.numeric(minute))  # Convert minute to numeric
+long_df_downsampled <- long_df %>%
+  mutate(minute_group = floor(minute / 5) * 5) %>%  # Group minutes into 5-minute intervals
+  group_by(SEQN, sex, education, minute_group) %>%
+  summarise(activity = mean(activity, na.rm = TRUE)) %>%
+  ungroup() %>%
+  rename(minute = minute_group)
+
+ggplot(long_df, aes(x = minute, y = activity, color = sex)) +
+  geom_smooth(method = "loess", se = FALSE, size = 1.5) +  
+  facet_wrap(~education, ncol = 1) +  # One panel per education level
+  labs(title = "24-Hour Activity Time Course by Education Level and Sex", 
+       x = "Minute of the Day", 
+       y = "Activity (MIMS)") +
+  scale_color_manual(values = c("Male" = "blue", "Female" = "red")) +
+  theme_minimal() +
+  theme(legend.position = "bottom", 
+        strip.text = element_text(size = 14),
+        axis.title = element_text(size = 12),
+        axis.text = element_text(size = 10))
+```
+
+```{r}
+ggsave("D:/P8105/p8105_hw3_tt3022/picture/activity_time_courses_60min_intervals.png", 
+       width = 8, height = 8)
+```
+
+
+
+
