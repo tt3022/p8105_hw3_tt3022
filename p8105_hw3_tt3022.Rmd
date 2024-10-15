@@ -91,7 +91,7 @@ long_df <- filtered_df %>%
                names_to = "minute", 
                names_prefix = "min", 
                values_to = "activity") %>%
-  mutate(minute = as.numeric(minute))  # Convert minute to numeric
+  mutate(minute = as.numeric(minute))  
 long_df_downsampled <- long_df %>%
   mutate(minute_group = floor(minute / 5) * 5) %>%  # Group minutes into 5-minute intervals
   group_by(SEQN, sex, education, minute_group) %>%
@@ -101,7 +101,7 @@ long_df_downsampled <- long_df %>%
 
 ggplot(long_df, aes(x = minute, y = activity, color = sex)) +
   geom_smooth(method = "loess", se = FALSE, size = 1.5) +  
-  facet_wrap(~education, ncol = 1) +  # One panel per education level
+  facet_wrap(~education, ncol = 1) +  
   labs(title = "24-Hour Activity Time Course by Education Level and Sex", 
        x = "Minute of the Day", 
        y = "Activity (MIMS)") +
@@ -114,9 +114,97 @@ ggplot(long_df, aes(x = minute, y = activity, color = sex)) +
 ```
 
 ```{r}
-ggsave("D:/P8105/p8105_hw3_tt3022/picture/activity_time_courses_60min_intervals.png", 
+ggsave("D:/P8105/p8105_hw3_tt3022/picture/activity_time_courses_5min_intervals.png", 
        width = 8, height = 8)
 ```
+The 24-hour activity time course shows a consistent pattern across education levels, with activity increasing in the morning, peaking around midday, and declining in the evening.
+
+
+#Problem 3
+read datasets
+```{r}
+jan_2020 <- read_csv("D:/P8105/p8105_hw3_tt3022/Data/Jan 2020 Citi.csv")
+jul_2020 <- read_csv("D:/P8105/p8105_hw3_tt3022/Data/July 2020 Citi.csv")
+jan_2024 <- read_csv("D:/P8105/p8105_hw3_tt3022/Data/Jan 2024 Citi.csv")
+jul_2024 <- read_csv("D:/P8105/p8105_hw3_tt3022/Data/July 2024 Citi.csv")
+```
+
+since they have the same variables, we can combine by row
+```{r}
+jan_2020 <- jan_2020 %>% mutate(year = 2020, month = "January")
+jul_2020 <- jul_2020 %>% mutate(year = 2020, month = "July")
+jan_2024 <- jan_2024 %>% mutate(year = 2024, month = "January")
+jul_2024 <- jul_2024 %>% mutate(year = 2024, month = "July")
+
+combined_df <- bind_rows(jan_2020, jul_2020, jan_2024, jul_2024)
+```
+
+create the table
+```{r}
+summary_table <- combined_df %>%
+  group_by(year, month, member_casual) %>%
+  summarise(total_rides = n()) %>%
+  ungroup()
+```
+
+Citi Bike members consistently take more rides than casual riders, regardless of the month and the number of rides increased significantly in July 2024 compared to July 2020.
+
+```{r}
+popular_stations <- jul_2024 %>%
+  group_by(start_station_name) %>%
+  summarise(total_rides = n()) %>%
+  arrange(desc(total_rides)) %>%
+  slice_max(total_rides, n = 5)  
+```
+
+```{r}
+median_duration_df <- combined_df %>%
+  group_by(year, month, weekdays) %>%
+  summarise(median_duration = median(duration, na.rm = TRUE)) %>%
+  ungroup()
+ggplot(median_duration_df, aes(x = weekdays, y = median_duration, fill = weekdays)) +
+  geom_bar(stat = "identity", position = "dodge") +  
+  facet_grid(year ~ month) +  
+  labs(title = "Effects of Day of the Week, Month, and Year on Median Ride Duration",
+       x = "Day of the Week",
+       y = "Median Ride Duration (minutes)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+```{r}
+ggsave("D:/P8105/p8105_hw3_tt3022/picture/median_ride_duration_plot.png", 
+       width = 10, height = 6)
+```
+
+It shows that Saturdays and Sundays consistently show higher median ride durations compared to weekdays and July has generally higher median ride durations across most days of the week compared to January in both 2020 and 2024.
+
+
+```{r}
+data_2024 <- combined_df %>%
+  filter(year == 2024)
+ggplot(data_2024, aes(x = rideable_type, y = duration, fill = member_casual)) +
+  geom_boxplot(outlier.shape = NA, width = 0.6) +  
+  coord_cartesian(ylim = c(0, 100)) +  
+  facet_wrap(~ month) +  
+  labs(title = "Impact of Month, Membership Status, and Bike Type on Ride Duration (2024)",
+       x = "Bike Type",
+       y = "Ride Duration (minutes)",
+       fill = "Rider Type") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggsave("D:/P8105/p8105_hw3_tt3022/picture/ride_duration_by_bike_type_and_membership_2024.png", 
+       width = 10, height = 6)
+```
+Electric bikes generally have shorter ride durations compared to classic bikes.
+Casual riders have longer ride durations compared to members for both bike types.
+July shows slightly longer ride durations.
+
+
+
+
+
+
+
 
 
 
